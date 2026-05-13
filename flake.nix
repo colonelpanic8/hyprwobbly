@@ -32,6 +32,7 @@
       "Wobbly.hpp"
       "globals.hpp"
       "shaders.hpp"
+      "TransformerCompat.cpp"
     ];
 
     sourceFileArgs = lib.concatMapStringsSep " " lib.escapeShellArg sourceFiles;
