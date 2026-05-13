@@ -38,10 +38,11 @@ static std::string hkStyleValidInConfigVar(CHyprAnimationManager* thisptr, const
 }
 
 static bool hasWobbly(PHLWINDOW pWindow) {
-    return std::ranges::any_of(pWindow->m_transformers, [pWindow](const auto& transformer) {
-        const auto WOBBLY = dynamic_cast<CWobblyTransformer*>(transformer.get());
-        return WOBBLY && WOBBLY->belongsTo(pWindow);
-    });
+    return std::ranges::any_of(g_transformers, [pWindow](const auto* wobbly) { return wobbly && wobbly->belongsTo(pWindow); });
+}
+
+static bool isWobblyTransformer(const UP<IWindowTransformer>& transformer) {
+    return std::ranges::any_of(g_transformers, [&](const auto* wobbly) { return static_cast<const void*>(wobbly) == static_cast<const void*>(transformer.get()); });
 }
 
 static void addWobbly(PHLWINDOW pWindow) {
@@ -141,7 +142,7 @@ APICALL EXPORT void PLUGIN_EXIT() {
     g_openWindowListener.reset();
 
     for (auto& window : g_pCompositor->m_windows) {
-        std::erase_if(window->m_transformers, [](const auto& transformer) { return dynamic_cast<CWobblyTransformer*>(transformer.get()) != nullptr; });
+        std::erase_if(window->m_transformers, isWobblyTransformer);
     }
 
     g_transformers.clear();
