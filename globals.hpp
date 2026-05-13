@@ -9,7 +9,8 @@ class CWobblyTransformer;
 
 inline HANDLE                           PHANDLE = nullptr;
 inline SP<HOOK_CALLBACK_FN>             g_pOpenWindowHook;
-inline wl_event_source*                 g_pTick = nullptr;
+inline CFunctionHook*                   g_pStyleValidHook = nullptr;
+inline wl_event_source*                 g_pTick           = nullptr;
 inline SShader                          g_wobblyShader;
 inline bool                             g_shaderReady = false;
 inline GLuint                           g_wobblyVAO   = 0;

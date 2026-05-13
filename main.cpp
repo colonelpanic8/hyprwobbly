@@ -3,6 +3,7 @@
 #include <hyprland/src/Compositor.hpp>
 #include <hyprland/src/desktop/view/Window.hpp>
 #include <hyprland/src/managers/HookSystemManager.hpp>
+#include <hyprland/src/managers/animation/AnimationManager.hpp>
 #include <hyprland/src/render/OpenGL.hpp>
 #include <hyprland/src/render/Renderer.hpp>
 
@@ -16,8 +17,22 @@
 #include "globals.hpp"
 #include "shaders.hpp"
 
+typedef std::string (*origStyleValid)(CHyprAnimationManager*, const std::string&, const std::string&);
+
 APICALL EXPORT std::string PLUGIN_API_VERSION() {
     return HYPRLAND_API_VERSION;
+}
+
+static bool isWobblyStyle(const std::string& config, std::string style) {
+    std::ranges::transform(style, style.begin(), [](unsigned char c) { return std::tolower(c); });
+    return config == "windowsMove" && (style == "wobbly" || style.starts_with("wobbly "));
+}
+
+static std::string hkStyleValidInConfigVar(CHyprAnimationManager* thisptr, const std::string& config, const std::string& style) {
+    if (isWobblyStyle(config, style))
+        return "";
+
+    return (*(origStyleValid)g_pStyleValidHook->m_original)(thisptr, config, style);
 }
 
 static bool hasWobbly(PHLWINDOW pWindow) {
@@ -68,6 +83,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     }
 
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:enabled", Hyprlang::INT{1});
+    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:mode", Hyprlang::STRING{"always"});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:grid_width", Hyprlang::INT{4});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:grid_height", Hyprlang::INT{4});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:tiles_x", Hyprlang::INT{12});
@@ -78,6 +94,20 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:move_factor", Hyprlang::FLOAT{0.65F});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:resize_factor", Hyprlang::FLOAT{0.45F});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:max_warp", Hyprlang::FLOAT{140.F});
+
+    auto FNS = HyprlandAPI::findFunctionsByName(PHANDLE, "styleValidInConfigVar");
+    for (auto& fn : FNS) {
+        if (!fn.demangled.contains("CHyprAnimationManager"))
+            continue;
+
+        g_pStyleValidHook = HyprlandAPI::createFunctionHook(PHANDLE, fn.address, (void*)::hkStyleValidInConfigVar);
+        break;
+    }
+
+    if (!g_pStyleValidHook || !g_pStyleValidHook->hook()) {
+        HyprlandAPI::addNotification(PHANDLE, "[hyprwobbly] Failure in initialization: failed to hook animation style validator", CHyprColor{1.0, 0.2, 0.2, 1.0}, 5000);
+        throw std::runtime_error("[hyprwobbly] failed to hook animation style validator");
+    }
 
     g_pHyprRenderer->makeEGLCurrent();
     g_wobblyShader.program = g_pHyprOpenGL->createProgram(WOBBLY_VERTEX_SHADER, WOBBLY_FRAGMENT_SHADER);

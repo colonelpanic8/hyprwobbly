@@ -21,10 +21,15 @@ hyprpm enable hyprwobbly
 
 ## Configuration
 
+By default, the plugin applies wobble to all window movement and resize geometry
+changes, including keyboard dispatchers such as `moveactive`,
+`movewindowpixel`, and layout-driven movements.
+
 ```ini
 plugin {
   hyprwobbly {
     enabled = true
+    mode = always
     grid_width = 4
     grid_height = 4
     tiles_x = 12
@@ -35,6 +40,19 @@ plugin {
     move_factor = 0.65
     resize_factor = 0.45
     max_warp = 140.0
+  }
+}
+```
+
+You can also make wobble opt in through Hyprland's `windowsMove` animation
+style:
+
+```ini
+animation = windowsMove, 1, 4, default, wobbly
+
+plugin {
+  hyprwobbly {
+    mode = style
   }
 }
 ```

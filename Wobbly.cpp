@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 #include "globals.hpp"
 
@@ -34,6 +35,15 @@ namespace {
             auto* const* DATA = (Hyprlang::FLOAT* const*)VALUE->getDataStaticPtr();
             return DATA && *DATA ? sc<float>(**DATA) : fallback;
         }
+    }
+
+    std::string cfgString(const std::string& name, const std::string& fallback) {
+        const auto VALUE = HyprlandAPI::getConfigValue(PHANDLE, name);
+        if (!VALUE)
+            return fallback;
+
+        auto const* DATA = (Hyprlang::STRING const*)VALUE->getDataStaticPtr();
+        return DATA ? *DATA : fallback;
     }
 
     float length(const Vector2D& vec) {
@@ -100,6 +110,33 @@ float CWobblyTransformer::maxWarp() const {
 
 bool CWobblyTransformer::enabled() const {
     return cfg<int>("plugin:hyprwobbly:enabled", 1) != 0;
+}
+
+std::string CWobblyTransformer::mode() const {
+    auto MODE = cfgString("plugin:hyprwobbly:mode", "always");
+    std::ranges::transform(MODE, MODE.begin(), [](unsigned char c) { return std::tolower(c); });
+    return MODE;
+}
+
+bool CWobblyTransformer::hasWobblyAnimationStyle() const {
+    const auto PWINDOW = m_window.lock();
+    if (!PWINDOW)
+        return false;
+
+    auto style = PWINDOW->m_realPosition->getStyle();
+    std::ranges::transform(style, style.begin(), [](unsigned char c) { return std::tolower(c); });
+    return style == "wobbly" || style.starts_with("wobbly ");
+}
+
+bool CWobblyTransformer::shouldWobble() const {
+    if (!enabled())
+        return false;
+
+    const auto MODE = mode();
+    if (MODE == "style" || MODE == "animation")
+        return hasWobblyAnimationStyle();
+
+    return true;
 }
 
 size_t CWobblyTransformer::index(int x, int y) const {
@@ -207,8 +244,17 @@ void CWobblyTransformer::preWindowRender(CSurfacePassElement::SRenderData* pRend
     const Vector2D deltaPos  = fullBoxPx.pos() - m_sourceBoxPx.pos();
     const Vector2D deltaSize = newSize - m_sizePx;
 
-    const auto     POINTER = g_pInputManager->getMouseCoordsInternal();
-    m_wasDragging          = fullBox.containsPoint(POINTER);
+    if (!shouldWobble()) {
+        damage();
+        resetModel(newSize);
+        m_sourceBoxLayout = fullBox;
+        m_sourceBoxPx     = fullBoxPx;
+        m_active          = false;
+        return;
+    }
+
+    const auto POINTER = g_pInputManager->getMouseCoordsInternal();
+    m_wasDragging      = fullBox.containsPoint(POINTER);
 
     damage();
 
@@ -343,7 +389,7 @@ void CWobblyTransformer::damage() {
 }
 
 void CWobblyTransformer::tick(float dt) {
-    if (!enabled() || !m_initialized)
+    if (!shouldWobble() || !m_initialized)
         return;
 
     if (!m_active)
@@ -355,7 +401,7 @@ void CWobblyTransformer::tick(float dt) {
 }
 
 CFramebuffer* CWobblyTransformer::transform(CFramebuffer* in) {
-    if (!enabled() || !m_initialized || !m_active || !in || !in->getTexture() || !g_shaderReady)
+    if (!shouldWobble() || !m_initialized || !m_active || !in || !in->getTexture() || !g_shaderReady)
         return in;
 
     const auto PMONITOR = g_pHyprOpenGL->m_renderData.pMonitor.lock();

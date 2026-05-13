@@ -59,6 +59,9 @@ class CWobblyTransformer : public IWindowTransformer {
     float                      resizeFactor() const;
     float                      maxWarp() const;
     bool                       enabled() const;
+    std::string                mode() const;
+    bool                       hasWobblyAnimationStyle() const;
+    bool                       shouldWobble() const;
 
     size_t                     index(int x, int y) const;
     void                       resetModel(const Vector2D& size);
