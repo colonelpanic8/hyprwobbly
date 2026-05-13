@@ -16,28 +16,16 @@
 using namespace Hyprutils::Memory;
 using Render::GL::g_pHyprOpenGL;
 namespace {
-    template <typename T>
-    T cfg(const std::string& name, T fallback) {
-        const auto VALUE = HyprlandAPI::getConfigValue(PHANDLE, name);
-        if (!VALUE)
-            return fallback;
-
-        if constexpr (std::is_same_v<T, int>) {
-            auto* const* DATA = (Hyprlang::INT* const*)VALUE->getDataStaticPtr();
-            return DATA && *DATA ? sc<int>(**DATA) : fallback;
-        } else {
-            auto* const* DATA = (Hyprlang::FLOAT* const*)VALUE->getDataStaticPtr();
-            return DATA && *DATA ? sc<float>(**DATA) : fallback;
-        }
+    int cfgInt(const SP<Config::Values::CIntValue>& value, int fallback) {
+        return value ? sc<int>(value->value()) : fallback;
     }
 
-    std::string cfgString(const std::string& name, const std::string& fallback) {
-        const auto VALUE = HyprlandAPI::getConfigValue(PHANDLE, name);
-        if (!VALUE)
-            return fallback;
+    float cfgFloat(const SP<Config::Values::CFloatValue>& value, float fallback) {
+        return value ? sc<float>(value->value()) : fallback;
+    }
 
-        auto const* DATA = (Hyprlang::STRING const*)VALUE->getDataStaticPtr();
-        return DATA ? *DATA : fallback;
+    std::string cfgString(const SP<Config::Values::CStringValue>& value, const std::string& fallback) {
+        return value ? value->value() : fallback;
     }
 
     float length(const Vector2D& vec) {
@@ -63,51 +51,51 @@ bool CWobblyTransformer::belongsTo(PHLWINDOW pWindow) const {
 }
 
 int CWobblyTransformer::gridWidth() const {
-    return std::clamp(cfg<int>("plugin:hyprwobbly:grid_width", 4), 2, 16);
+    return std::clamp(cfgInt(g_pGridWidth, 4), 2, 16);
 }
 
 int CWobblyTransformer::gridHeight() const {
-    return std::clamp(cfg<int>("plugin:hyprwobbly:grid_height", 4), 2, 16);
+    return std::clamp(cfgInt(g_pGridHeight, 4), 2, 16);
 }
 
 int CWobblyTransformer::tileCountX() const {
-    return std::clamp(cfg<int>("plugin:hyprwobbly:tiles_x", 12), 1, 80);
+    return std::clamp(cfgInt(g_pTilesX, 12), 1, 80);
 }
 
 int CWobblyTransformer::tileCountY() const {
-    return std::clamp(cfg<int>("plugin:hyprwobbly:tiles_y", 12), 1, 80);
+    return std::clamp(cfgInt(g_pTilesY, 12), 1, 80);
 }
 
 float CWobblyTransformer::springK() const {
-    return std::clamp(cfg<float>("plugin:hyprwobbly:spring_k", 18.F), 0.1F, 200.F);
+    return std::clamp(cfgFloat(g_pSpringK, 18.F), 0.1F, 200.F);
 }
 
 float CWobblyTransformer::friction() const {
-    return std::clamp(cfg<float>("plugin:hyprwobbly:friction", 8.F), 0.F, 80.F);
+    return std::clamp(cfgFloat(g_pFriction, 8.F), 0.F, 80.F);
 }
 
 float CWobblyTransformer::mass() const {
-    return std::clamp(cfg<float>("plugin:hyprwobbly:mass", 12.F), 1.F, 200.F);
+    return std::clamp(cfgFloat(g_pMass, 12.F), 1.F, 200.F);
 }
 
 float CWobblyTransformer::moveFactor() const {
-    return std::clamp(cfg<float>("plugin:hyprwobbly:move_factor", 0.65F), 0.F, 4.F);
+    return std::clamp(cfgFloat(g_pMoveFactor, 0.65F), 0.F, 4.F);
 }
 
 float CWobblyTransformer::resizeFactor() const {
-    return std::clamp(cfg<float>("plugin:hyprwobbly:resize_factor", 0.45F), 0.F, 4.F);
+    return std::clamp(cfgFloat(g_pResizeFactor, 0.45F), 0.F, 4.F);
 }
 
 float CWobblyTransformer::maxWarp() const {
-    return std::clamp(cfg<float>("plugin:hyprwobbly:max_warp", 140.F), 1.F, 600.F);
+    return std::clamp(cfgFloat(g_pMaxWarp, 140.F), 1.F, 600.F);
 }
 
 bool CWobblyTransformer::enabled() const {
-    return cfg<int>("plugin:hyprwobbly:enabled", 1) != 0;
+    return cfgInt(g_pEnabled, 1) != 0;
 }
 
 std::string CWobblyTransformer::mode() const {
-    auto MODE = cfgString("plugin:hyprwobbly:mode", "always");
+    auto MODE = cfgString(g_pMode, "always");
     std::ranges::transform(MODE, MODE.begin(), [](unsigned char c) { return std::tolower(c); });
     return MODE;
 }

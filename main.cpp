@@ -30,6 +30,27 @@ static bool isWobblyStyle(const std::string& config, std::string style) {
     return config == "windowsMove" && (style == "wobbly" || style.starts_with("wobbly "));
 }
 
+template <typename T>
+static void addConfigValue(SP<T>& storage, SP<T> value) {
+    storage = std::move(value);
+    HyprlandAPI::addConfigValueV2(PHANDLE, storage);
+}
+
+static void registerConfigValues() {
+    addConfigValue(g_pEnabled, makeShared<Config::Values::CIntValue>("plugin:hyprwobbly:enabled", "enabled", 1));
+    addConfigValue(g_pMode, makeShared<Config::Values::CStringValue>("plugin:hyprwobbly:mode", "mode", "always"));
+    addConfigValue(g_pGridWidth, makeShared<Config::Values::CIntValue>("plugin:hyprwobbly:grid_width", "grid width", 4));
+    addConfigValue(g_pGridHeight, makeShared<Config::Values::CIntValue>("plugin:hyprwobbly:grid_height", "grid height", 4));
+    addConfigValue(g_pTilesX, makeShared<Config::Values::CIntValue>("plugin:hyprwobbly:tiles_x", "horizontal mesh tiles", 12));
+    addConfigValue(g_pTilesY, makeShared<Config::Values::CIntValue>("plugin:hyprwobbly:tiles_y", "vertical mesh tiles", 12));
+    addConfigValue(g_pSpringK, makeShared<Config::Values::CFloatValue>("plugin:hyprwobbly:spring_k", "spring constant", 18.F));
+    addConfigValue(g_pFriction, makeShared<Config::Values::CFloatValue>("plugin:hyprwobbly:friction", "friction", 8.F));
+    addConfigValue(g_pMass, makeShared<Config::Values::CFloatValue>("plugin:hyprwobbly:mass", "mass", 12.F));
+    addConfigValue(g_pMoveFactor, makeShared<Config::Values::CFloatValue>("plugin:hyprwobbly:move_factor", "move factor", 0.65F));
+    addConfigValue(g_pResizeFactor, makeShared<Config::Values::CFloatValue>("plugin:hyprwobbly:resize_factor", "resize factor", 0.45F));
+    addConfigValue(g_pMaxWarp, makeShared<Config::Values::CFloatValue>("plugin:hyprwobbly:max_warp", "maximum warp", 140.F));
+}
+
 static std::string hkStyleValidInConfigVar(CHyprAnimationManager* thisptr, const std::string& config, const std::string& style) {
     if (isWobblyStyle(config, style))
         return "";
@@ -81,18 +102,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         throw std::runtime_error("[hyprwobbly] Version mismatch");
     }
 
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:enabled", Hyprlang::INT{1});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:mode", Hyprlang::STRING{"always"});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:grid_width", Hyprlang::INT{4});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:grid_height", Hyprlang::INT{4});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:tiles_x", Hyprlang::INT{12});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:tiles_y", Hyprlang::INT{12});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:spring_k", Hyprlang::FLOAT{18.F});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:friction", Hyprlang::FLOAT{8.F});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:mass", Hyprlang::FLOAT{12.F});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:move_factor", Hyprlang::FLOAT{0.65F});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:resize_factor", Hyprlang::FLOAT{0.45F});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprwobbly:max_warp", Hyprlang::FLOAT{140.F});
+    registerConfigValues();
 
     auto FNS = HyprlandAPI::findFunctionsByName(PHANDLE, "styleValidInConfigVar");
     for (auto& fn : FNS) {
