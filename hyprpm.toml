@@ -1,0 +1,11 @@
+[repository]
+name = "hyprwobbly"
+authors = ["Ivan Malison"]
+
+[hyprwobbly]
+description = "Compiz-style wobbly windows for Hyprland"
+authors = ["Ivan Malison"]
+output = "hyprwobbly.so"
+build = [
+    "make all",
+]
