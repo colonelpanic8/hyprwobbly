@@ -2,7 +2,7 @@
 
 #include <hyprland/src/Compositor.hpp>
 #include <hyprland/src/desktop/view/Window.hpp>
-#include <hyprland/src/managers/HookSystemManager.hpp>
+#include <hyprland/src/event/EventBus.hpp>
 #include <hyprland/src/managers/animation/AnimationManager.hpp>
 #include <hyprland/src/render/OpenGL.hpp>
 #include <hyprland/src/render/Renderer.hpp>
@@ -16,6 +16,8 @@
 #include "Wobbly.hpp"
 #include "globals.hpp"
 #include "shaders.hpp"
+
+using Render::GL::g_pHyprOpenGL;
 
 typedef std::string (*origStyleValid)(CHyprAnimationManager*, const std::string&, const std::string&);
 
@@ -47,10 +49,6 @@ static void addWobbly(PHLWINDOW pWindow) {
         return;
 
     pWindow->m_transformers.push_back(makeUnique<CWobblyTransformer>(pWindow));
-}
-
-static void onNewWindow(std::any data) {
-    addWobbly(std::any_cast<PHLWINDOW>(data));
 }
 
 static int onTick(void*) {
@@ -109,22 +107,15 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         throw std::runtime_error("[hyprwobbly] failed to hook animation style validator");
     }
 
-    g_pHyprRenderer->makeEGLCurrent();
-    g_wobblyShader.program = g_pHyprOpenGL->createProgram(WOBBLY_VERTEX_SHADER, WOBBLY_FRAGMENT_SHADER);
-    g_shaderReady          = g_wobblyShader.program != 0;
+    g_pHyprOpenGL->makeEGLCurrent();
+    g_pWobblyShader = makeShared<CShader>();
+    g_shaderReady   = g_pWobblyShader->createProgram(WOBBLY_VERTEX_SHADER, WOBBLY_FRAGMENT_SHADER);
     if (!g_shaderReady) {
         HyprlandAPI::addNotification(PHANDLE, "[hyprwobbly] Failure in initialization: shader compilation failed", CHyprColor{1.0, 0.2, 0.2, 1.0}, 5000);
         throw std::runtime_error("[hyprwobbly] shader compilation failed");
     }
 
-    g_wobblyShader.uniformLocations[SHADER_PROJ]       = glGetUniformLocation(g_wobblyShader.program, "proj");
-    g_wobblyShader.uniformLocations[SHADER_TEX]        = glGetUniformLocation(g_wobblyShader.program, "tex");
-    g_wobblyShader.uniformLocations[SHADER_POS_ATTRIB] = glGetAttribLocation(g_wobblyShader.program, "pos");
-    g_wobblyShader.uniformLocations[SHADER_TEX_ATTRIB] = glGetAttribLocation(g_wobblyShader.program, "texcoord");
-    glGenVertexArrays(1, &g_wobblyVAO);
-    glGenBuffers(1, &g_wobblyVBO);
-
-    g_pOpenWindowHook = HyprlandAPI::registerCallbackDynamic(PHANDLE, "openWindow", [](void*, SCallbackInfo&, std::any data) { onNewWindow(data); });
+    g_openWindowListener = Event::bus()->m_events.window.open.listen([](PHLWINDOW pWindow) { addWobbly(pWindow); });
 
     g_pTick = wl_event_loop_add_timer(g_pCompositor->m_wlEventLoop, &onTick, nullptr);
     wl_event_source_timer_update(g_pTick, 1);
@@ -147,20 +138,16 @@ APICALL EXPORT void PLUGIN_EXIT() {
         wl_event_source_remove(g_pTick);
         g_pTick = nullptr;
     }
+    g_openWindowListener.reset();
 
     for (auto& window : g_pCompositor->m_windows) {
         std::erase_if(window->m_transformers, [](const auto& transformer) { return dynamic_cast<CWobblyTransformer*>(transformer.get()) != nullptr; });
     }
 
     g_transformers.clear();
-    if (g_wobblyVBO) {
-        glDeleteBuffers(1, &g_wobblyVBO);
-        g_wobblyVBO = 0;
+    if (g_pWobblyShader) {
+        g_pWobblyShader->destroy();
+        g_pWobblyShader.reset();
     }
-    if (g_wobblyVAO) {
-        glDeleteVertexArrays(1, &g_wobblyVAO);
-        g_wobblyVAO = 0;
-    }
-    g_wobblyShader.destroy();
     g_shaderReady = false;
 }

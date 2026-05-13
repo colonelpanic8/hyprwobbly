@@ -13,12 +13,12 @@ class CWobblyTransformer : public IWindowTransformer {
     explicit CWobblyTransformer(PHLWINDOW pWindow);
     ~CWobblyTransformer() override;
 
-    void          preWindowRender(CSurfacePassElement::SRenderData* pRenderData) override;
-    CFramebuffer* transform(CFramebuffer* in) override;
+    void                     preWindowRender(CSurfacePassElement::SRenderData* pRenderData) override;
+    SP<Render::IFramebuffer> transform(SP<Render::IFramebuffer> in) override;
 
-    void          tick(float dt);
-    void          damage();
-    bool          belongsTo(PHLWINDOW pWindow) const;
+    void                     tick(float dt);
+    void                     damage();
+    bool                     belongsTo(PHLWINDOW pWindow) const;
 
   private:
     struct SPoint {
@@ -39,7 +39,7 @@ class CWobblyTransformer : public IWindowTransformer {
     std::vector<SPoint>        m_points;
     std::vector<SSpring>       m_springs;
 
-    CFramebuffer               m_outputFB;
+    SP<Render::IFramebuffer>   m_outputFB;
     Vector2D                   m_sizePx;
     CBox                       m_sourceBoxLayout;
     CBox                       m_sourceBoxPx;

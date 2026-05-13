@@ -2,7 +2,7 @@
   description = "hyprwobbly, a Compiz-style wobbly windows plugin for Hyprland";
 
   inputs = {
-    hyprland.url = "github:hyprwm/Hyprland/48a024e0322bbd7c4c88126498ec478444ec4cb2";
+    hyprland.url = "github:hyprwm/Hyprland";
     nixpkgs.follows = "hyprland/nixpkgs";
     systems.follows = "hyprland/systems";
   };

@@ -14,14 +14,8 @@
 #include "globals.hpp"
 
 using namespace Hyprutils::Memory;
+using Render::GL::g_pHyprOpenGL;
 namespace {
-    struct SMeshVertex {
-        float x = 0;
-        float y = 0;
-        float u = 0;
-        float v = 0;
-    };
-
     template <typename T>
     T cfg(const std::string& name, T fallback) {
         const auto VALUE = HyprlandAPI::getConfigValue(PHANDLE, name);
@@ -400,26 +394,28 @@ void CWobblyTransformer::tick(float dt) {
     damage();
 }
 
-CFramebuffer* CWobblyTransformer::transform(CFramebuffer* in) {
-    if (!shouldWobble() || !m_initialized || !m_active || !in || !in->getTexture() || !g_shaderReady)
+SP<Render::IFramebuffer> CWobblyTransformer::transform(SP<Render::IFramebuffer> in) {
+    if (!shouldWobble() || !m_initialized || !m_active || !in || !in->getTexture() || !g_shaderReady || !g_pWobblyShader)
         return in;
 
-    const auto PMONITOR = g_pHyprOpenGL->m_renderData.pMonitor.lock();
+    const auto PMONITOR = g_pHyprRenderer->m_renderData.pMonitor.lock();
     if (!PMONITOR)
         return in;
 
     const Vector2D MONSIZE = PMONITOR->m_transformedSize;
 
-    if (!m_outputFB.isAllocated() || m_outputFB.m_size != MONSIZE)
-        m_outputFB.alloc(MONSIZE.x, MONSIZE.y);
+    if (!m_outputFB)
+        m_outputFB = g_pHyprRenderer->createFB("hyprwobbly");
 
-    m_outputFB.bind();
-    g_pHyprOpenGL->m_renderData.currentFB = &m_outputFB;
+    if (!m_outputFB->isAllocated() || m_outputFB->m_size != MONSIZE)
+        m_outputFB->alloc(MONSIZE.x, MONSIZE.y);
+
+    g_pHyprRenderer->bindFB(m_outputFB);
     g_pHyprOpenGL->scissor(nullptr);
     glClearColor(0.F, 0.F, 0.F, 0.F);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    std::vector<SMeshVertex> vertices;
+    std::vector<Render::GL::SVertex> vertices;
     vertices.reserve(sc<size_t>(tileCountX() * tileCountY() * 6));
 
     const auto pushVertex = [&](float u, float v) {
@@ -455,25 +451,20 @@ CFramebuffer* CWobblyTransformer::transform(CFramebuffer* in) {
     in->getTexture()->setTexParameter(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     in->getTexture()->setTexParameter(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    g_pHyprOpenGL->useProgram(g_wobblyShader.program);
-    g_wobblyShader.setUniformInt(SHADER_TEX, 0);
+    auto shader = g_pHyprOpenGL->useShader(g_pWobblyShader);
+    shader->setUniformInt(SHADER_TEX, 0);
 
     CBox monbox   = {0, 0, MONSIZE.x, MONSIZE.y};
-    auto matrix   = g_pHyprOpenGL->m_renderData.monitorProjection.projectBox(monbox, HYPRUTILS_TRANSFORM_NORMAL, monbox.rot);
-    auto glMatrix = g_pHyprOpenGL->m_renderData.projection.copy().multiply(matrix);
-    g_wobblyShader.setUniformMatrix3fv(SHADER_PROJ, 1, GL_TRUE, glMatrix.getMatrix());
+    auto glMatrix = g_pHyprRenderer->projectBoxToTarget(monbox);
+    shader->setUniformMatrix3fv(SHADER_PROJ, 1, GL_TRUE, glMatrix.getMatrix());
 
-    glBindVertexArray(g_wobblyVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, g_wobblyVBO);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(SMeshVertex), vertices.data(), GL_DYNAMIC_DRAW);
-    glEnableVertexAttribArray(g_wobblyShader.uniformLocations[SHADER_POS_ATTRIB]);
-    glEnableVertexAttribArray(g_wobblyShader.uniformLocations[SHADER_TEX_ATTRIB]);
-    glVertexAttribPointer(g_wobblyShader.uniformLocations[SHADER_POS_ATTRIB], 2, GL_FLOAT, GL_FALSE, sizeof(SMeshVertex), (void*)offsetof(SMeshVertex, x));
-    glVertexAttribPointer(g_wobblyShader.uniformLocations[SHADER_TEX_ATTRIB], 2, GL_FLOAT, GL_FALSE, sizeof(SMeshVertex), (void*)offsetof(SMeshVertex, u));
+    glBindVertexArray(shader->getUniformLocation(SHADER_SHADER_VAO));
+    glBindBuffer(GL_ARRAY_BUFFER, shader->getUniformLocation(SHADER_SHADER_VBO));
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Render::GL::SVertex), vertices.data(), GL_DYNAMIC_DRAW);
     glDrawArrays(GL_TRIANGLES, 0, vertices.size());
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     in->getTexture()->unbind();
 
-    return &m_outputFB;
+    return m_outputFB;
 }
