@@ -204,7 +204,18 @@ void CWobblyTransformer::preWindowRender(CSurfacePassElement::SRenderData* pRend
     if (!PMONITOR)
         return;
 
-    CBox fullBox = PWINDOW->getFullWindowBoundingBox();
+    const CBox     currentClientBox   = {PWINDOW->m_realPosition->value(), PWINDOW->m_realSize->value()};
+    const CBox     currentFullBox     = PWINDOW->getFullWindowBoundingBox();
+    const Vector2D topLeftExtents     = currentClientBox.pos() - currentFullBox.pos();
+    const Vector2D bottomRightExtents = currentFullBox.pos() + currentFullBox.size() - currentClientBox.pos() - currentClientBox.size();
+
+    CBox           fullBox = {
+        pRenderData->pos.x - topLeftExtents.x,
+        pRenderData->pos.y - topLeftExtents.y,
+        pRenderData->w + topLeftExtents.x + bottomRightExtents.x,
+        pRenderData->h + topLeftExtents.y + bottomRightExtents.y,
+    };
+
     if (fullBox.empty())
         fullBox = {pRenderData->pos.x, pRenderData->pos.y, pRenderData->w, pRenderData->h};
 
